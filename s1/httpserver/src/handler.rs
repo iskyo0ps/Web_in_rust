@@ -25,7 +25,7 @@ pub struct WebServerHandler;
 pub struct OrderStatus{
   order_id:i32,
   order_date:String, 
-  Order_status:String,
+  order_status:String,
 }
 
 impl Handler for PageNotFoundHandler{
