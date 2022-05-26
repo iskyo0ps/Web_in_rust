@@ -9,5 +9,6 @@ Task in list as follows:
 - [ ] Cargo run in $/project/ws/webservice;
 - [ ] Establish a posrgresql in local system，maybe I will write a brief intro about this;
 - [ ] Fail to parse manifest at Some cargo.toml files;
+- [ ] $project\ws> cargo test --bin teacher-service
 
 
