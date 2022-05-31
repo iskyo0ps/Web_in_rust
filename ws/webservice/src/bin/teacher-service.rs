@@ -6,6 +6,9 @@ use dotenv::dotenv;
 use sqlx::postgres::PgPoolOptions;
 
 
+
+#[path = "../db_access.rs"]
+mod db_access;
 #[path = "../handlers.rs"]
 mod handlers;
 #[path = "../routers.rs"]

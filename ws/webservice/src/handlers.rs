@@ -1,5 +1,6 @@
 use super::state::AppState;
 use actix_web::{web, HttpResponse};
+use super::db_access;
 
 pub async fn health_check_handler(
     app_state:web::Data<AppState>
@@ -13,28 +14,34 @@ pub async fn health_check_handler(
     HttpResponse::Ok().json(&response)
 }
 use super::models::Course;
-use chrono::Utc;
+// use chrono::Utc;
 
 pub async fn new_course(
   new_course:web::Json<Course>
-  app_state:app::Data<AppState>,
+  app_state:web::Data<AppState>,
 ) -> HttpResponse{
-  HttpResponse::Ok().json("Success")
+  let course = post_new_course_db(&app_state.db, new_course.into()).await;
+  HttpResponse::Ok().json(course)
 }
 
 
 pub async fn get_courses_for_teacher(
-  app_state:app::Data<AppState>,
+  app_state:web::Data<AppState>,
   params:web::Path<(usize,)>
 ) -> HttpResponse{
-  HttpResponse::Ok().json("Success")
+  let teacher_id = i32::try_from(params.0).unwrap();
+  let courses = get_courses_for_teacher_db(&app_state.db,teacher_id).await;
+  HttpResponse::Ok().json(courses)
 }
 
 pub async fn get_course_detail(
-  app_state:app::Data<AppState>,
-  params:web::Path<(usize,)>
+  app_state:web::Data<AppState>,
+  params:web::Path<(usize,usize)>
 ) -> HttpResponse{
-  HttpResponse::Ok().json("Success")
+  let teacher_id = i32::try_from(params.0).unwrap();
+  let course_id = i32::try_from(params.1).unwrap();
+  let course = get_courses_details_db(&app_state.db,teacher_id,course).await;
+  HttpResponse::Ok().json(course)
 }
 
 // pub async fn get_courses_for_teacher(
@@ -100,7 +107,7 @@ mod tests{
     let cousrse = web::Json(Course{
       teacher_id:1,
       name:"Test course".to_string(),
-      id:None,
+      id:Some(3),
       time:None,
     })
     let resp = new_course(course,app_state).await;
