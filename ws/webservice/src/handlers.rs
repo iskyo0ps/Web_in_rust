@@ -1,6 +1,72 @@
 use super::state::AppState;
 use actix_web::{web, HttpResponse};
 use super::db_access;
+use super::errors::MyError;
+
+pub async fn get_courses_for_teacher_db(
+)->Result<Vec<Course>,MyError>{
+
+}
+
+pub async fn get_courses_details_db(
+  pool:&PgPool,
+  teacher_id:i32,
+  course_id:i32,
+) -> result::Result<Course,MyError>{
+  let row = sqlx::query!(
+    r#"SELECT id,teacher_id,name,time
+    FROM course 
+    WHERE teacher_id = $1 and id = $2"#,
+    teacher_id,
+    course_id
+  )
+  .fetch_one(pool)
+  .await;
+
+  if let Ok(row) = row{
+    Ok(Course{
+      id:Some(row.id),
+      teacher_id:row.teacher_id,
+      name:row.name.clone(),
+      time:Some(NaiveDateTime::from(row.time.unwrap())),
+    })
+  }else{
+    Err(MyError::NotFound("Course Id not found".into()))
+  }
+}
+
+pub async fn post_new_course_db(
+  pool:&PgPool,
+  new_course:Course
+) ->Result<Course,MyError>{
+  let row = sqlx::query!(
+    r#"INSERT INTO course(id,teacher_id,name)
+    VALUES($1,$2,$3)
+    RETURNING id, teacher_id,name,time"#,
+    new_course.id,
+    new_course.teacher_id,
+    new_course.name
+  )
+  .fetch_one(pool)
+  .await?;
+
+  Ok(Course{
+    id:Some(row.id),
+    teacher_id:row.teacher_id,
+    name :row.name.clone(),
+    time:Some(NaiveDateTime::from(row.time.unwrap())),
+  })
+}
+
+// pub async fn get_course_detail(
+//   app_state:web::Data<AppState>,
+//   params:web::Path<(usize,usize)>
+// ) -> HttpResponse{
+//   let teacher_id = i32::try_from(params.0).unwrap();
+//   let course_id = i32::try_from(params.1).unwrap();
+//   let course = get_courses_details_db(&app_state.db,teacher_id,course).await;
+//   HttpResponse::Ok().json(course)
+// }
 
 pub async fn health_check_handler(
     app_state:web::Data<AppState>
@@ -19,29 +85,35 @@ use super::models::Course;
 pub async fn new_course(
   new_course:web::Json<Course>
   app_state:web::Data<AppState>,
-) -> HttpResponse{
-  let course = post_new_course_db(&app_state.db, new_course.into()).await;
-  HttpResponse::Ok().json(course)
+) -> Result<HttpResponse,MyError>{
+  post_new_course_db(&app_state.db, new_course.into())
+  .await
+  .map(|course|  HttpResponse::Ok().json(course))
+
 }
 
 
 pub async fn get_courses_for_teacher(
   app_state:web::Data<AppState>,
   params:web::Path<(usize,)>
-) -> HttpResponse{
+) -> Result<HttpResponse, MyError>{
   let teacher_id = i32::try_from(params.0).unwrap();
-  let courses = get_courses_for_teacher_db(&app_state.db,teacher_id).await;
-  HttpResponse::Ok().json(courses)
+  get_courses_for_teacher_db(&app_state.db,teacher_id)
+    .await
+    .map (|courses|HttpResponse::Ok().json(courses))
+  
 }
 
 pub async fn get_course_detail(
   app_state:web::Data<AppState>,
   params:web::Path<(usize,usize)>
-) -> HttpResponse{
+) -> Result<HttpResponse,MyError>{
   let teacher_id = i32::try_from(params.0).unwrap();
   let course_id = i32::try_from(params.1).unwrap();
-  let course = get_courses_details_db(&app_state.db,teacher_id,course).await;
-  HttpResponse::Ok().json(course)
+  get_courses_details_db(&app_state.db,teacher_id,course)
+  .await
+  .map(|course|HttpResponse::Ok().json(course));
+  
 }
 
 // pub async fn get_courses_for_teacher(
@@ -110,7 +182,7 @@ mod tests{
       id:Some(3),
       time:None,
     })
-    let resp = new_course(course,app_state).await;
+    let resp = new_course(course,app_state).await.unwrap();
     assert_eq!(resp.status(),StatusCode::Ok);
   }
 
@@ -125,8 +197,8 @@ mod tests{
       //courses:Mutex::new(vec![]),
       db:db_pool,
     });
-    let teacher_id:web::Path<(usize,)> = web::Path::From((1,));
-    let resp = get_courses_for_teacher(app_state,teacher_id).await;
+    let teacher_id:web::Path<(usize,)> = web::Path::from((1,));
+    let resp = get_courses_for_teacher(app_state,teacher_id).await.unwrap();
     assert_eq!(resp.status(),StatusCode::Ok);
   }
 
@@ -142,7 +214,7 @@ mod tests{
       db:db_pool,
     });
     let params :web::Path<(usize,usize)> = web::Path::from((1,1));
-    let resp = get_course_detail(app_state,params).await;
+    let resp = get_course_detail(app_state,params).await.unwrap();
     assert_eq!(resp.status(),StatusCode::Ok);
   }
 }
